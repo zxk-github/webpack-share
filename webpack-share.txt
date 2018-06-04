@@ -1,0 +1,8 @@
+1.抛开webpack tapable是什么，如何使用，内部原理，自己尝试写一个tapable,tapable在webpack中的应用
+2.构建流程的log打出来，描述整个打包流程，分析里面涉及流程
+3.compiler初始化出compilation之后，compiler,complication，childCompiler做了哪些具体的事情
+4.构建过程中的重大任务点，做了哪些事情
+5.生成的webpack run time文件中的代码是如何生成的，规则是啥，如何起作用的，尽量带着打包之后的源码进行解析
+6.loader和plugin的作用点，如何作用到webpack中，自己写一个loader和plugin
+
+

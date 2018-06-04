@@ -1,0 +1,110 @@
+笔记 
+每次输入webpack, 都会最先调用node_modules/.bin/webpack脚本
+
+阶段
+1. webpack配置参数初始化阶段
+加载配置文件和shell后缀参数申明的插件
+执行node_modules/.bin/webpack脚本。获取配置项以及在终端中输入的参数
+config.optimist.js中进行命令行中参数的解析
+convert-argv.js 根据对应的argv中的参数决定是否加载对应的插件
+
+
+2. 编译与构建流程
+根据传入的options对象，开始整个打包最漫长的一步，这个时候，webpack对象才刚被初始化，初始化逻辑在lib/webpack.js中
+function webpack(options){
+	let compiler;
+	compiler = new Compiler();
+	.../
+	return compiler;
+}
+
+webpack打包的执行入口是Compiler的run方法， 一旦run之后，就开始了编译和构建流程
+webpack打包中的几个关键webpack事件节点
+
+compile开始编译
+make 从入口点开始分析模块及其依赖的模块，创建这些模块的对象
+build-module 构建模块
+after-compile 完成构建
+seal 封装构建结果
+emit 把各个chunk输出到结果文件
+after-emit 完成输出
+
+1. 核心对象Compilation
+compiler.run后首先会触发compile，这一步会构建出complication对象
+
+complicaton两个作用
+一个是负责组织整个打包过程，包括了每个构建环节的输出环节所对应的方法，比如说addEntry(),_addModuleChain()，buildModule()，seal()，createChunkAssets(), 在每个节点都会触发webpack事件去调用各插件
+
+二是该对象内部存放着所有module，chunk，生成的asset以及用来生成最后打包文件的tempplate信息
+
+2.编译与构建主流程
+在创建module之前，Compiler会触发make, 并调用Complication.addEntry方法，通过options对象的entry字段找到入口js文件，之后，在addEntry中调用私有方法_addModuleChain
+
+_addModuleChain作用
+	1.根据模块类型获取对应的模块工厂并创建模块
+	2.构建模块
+
+构建模块耗时，细化分为三步
+	1.调用各loader处理模块之间的依赖
+	webpack可以把所有的资源整合成模块，不仅仅是js文件，所以需要一些loader对文件进行处理，webpack调用doBuild() 对每一个require()对应的loader进行加工，最后生成一个js bundle
+
+	2. 调用acorn解析loader处理后的源文件生成抽象语法树
+
+	3. 遍历AST，构建该模块所需要的依赖的模块
+	对于当前模块，或许存在着多个依赖的模块，当前模块会开辟一个依赖模块的数组，在遍历AST时，将require()中的模块通过addDependency()添加倒数组中，当前模块构建完成之后，webpack调用processModuleDependencies开始递归处理依赖的module,接着就会重复之前的构建步骤
+
+3. 构建细节
+module是webpack构建的核心实体，也是所有module的父类，它有几种不同子类：NormalModule，MultiModule, ContextModule, DelegatedModule等。但是这些核心实体都是在构建中
+
+
+
+打包文件流程 
+webpack.js中compiler.options = new WebpackOptionsApply().process(options, compiler);
+-->
+
+WebpackOptionsApply.js 根据webpack options进行初始化操作  
+compiler.apply(new EntryOptionPlugin());
+-->
+
+MultiEntryPlugin.js
+SingleEntryPlugin.js
+DynamicEntryPlugin.js
+
+三个文件都会触发make事件，并且调用compilation.addEntry方法
+
+-->
+调用_addModuleChain根据模块类型获取对应的模块工厂并创建模块，构建模块
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
