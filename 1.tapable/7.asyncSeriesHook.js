@@ -34,7 +34,7 @@ hook.promise().then(() => {
 */
 const hook2 = new AsyncSeriesHook();
 
-/*
+
 console.time('cost')
 hook2.tapAsync('plugin1', (cb) => {
   setTimeout(() => {
@@ -67,7 +67,6 @@ hook2.promise().then(() => {
   console.log('promise 触发')
 })
 
-*/
 
 const hook3 = new AsyncSeriesHook();
 

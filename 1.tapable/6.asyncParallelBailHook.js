@@ -2,8 +2,8 @@ const { AsyncParallelBailHook } = require("tapable");
 
 const hook = new AsyncParallelBailHook();
 
-/*
 
+/*
 hook.tap('plugin1', () => {
   console.log("plugin1")
 })
@@ -21,9 +21,9 @@ hook.callAsync(() => {
   console.log('callAsync触发')
 })
 
-hook.promise().then(() => {
-  console.log('promise触发')
-})
+// hook.promise().then(() => {
+//   console.log('promise触发')
+// })
 
 // 和syncBailHook实例的钩子一样，当钩子返回值不是undefined的时候，会停止后面插件的执行，执行callAsync和promise.then()中的回调函数
 
@@ -31,8 +31,8 @@ hook.promise().then(() => {
 
 const hook2 = new AsyncParallelBailHook();
 
-/* 
 
+/*
 hook2.tapAsync('plugin1',(cb) => {
   setTimeout(() => {
     console.log('plugin1')
@@ -43,8 +43,8 @@ hook2.tapAsync('plugin1',(cb) => {
 hook2.tapAsync('plugin2', (cb) => {
   setTimeout(() => {
     console.log('plugin2')
-    return 1
-    cb();
+    cb('1');
+    
   }, 500)
   
 })
@@ -61,17 +61,19 @@ hook2.callAsync(() => {
   console.log('callAsync 触发')
 })
 
-// 只会让回调函数不执行，下一个插件依然会执行
-
 */
+// 在callback中传入不是undefined的函数，会提前执行callAsync的回调函数，但是不会终止后面插件的执行
+
+
 
 const hook3 = new AsyncParallelBailHook();
+
 
 hook3.tapPromise('plugin1', () => {
   return new Promise((resolve, reject) => {
     setTimeout(() => {
       console.log("plugin1")
-      resolve(1)
+      resolve()
     }, 100);
   })
 })
@@ -80,7 +82,7 @@ hook3.tapPromise('plugin2', () => {
   return new Promise((resolve, reject) => {
     setTimeout(() => {
       console.log("plugin2")
-      resolve(2)
+      reject(2)
     }, 300);
   })
 })
@@ -95,8 +97,13 @@ hook3.tapPromise('plugin3', () => {
 })
 
 
+
 hook3.promise().then((data) => {
+  console.log('resolve')
   console.log(data)
 }, (data) => {
+  console.log('reject')
   console.log(data)
 })
+
+// 不会终止插件执行。resolve()参数不为undefined时，执行回调函数, 走resolve, reject走reject, 但是都不会终止插件的执行
