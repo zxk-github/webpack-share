@@ -2,10 +2,11 @@ const { AsyncParallelHook } = require('tapable');
 
 const parallelHook = new AsyncParallelHook();
 
-
+// console.time('cost')
 parallelHook.tap('tapPlugin1', () => {
   setTimeout(() => {
     console.log('tapPlugin1')
+    // console.timeEnd('cost')
   }, 700)
 })
 
@@ -30,9 +31,9 @@ parallelHook.callAsync(() => {
   console.log('触发tapPlugin')
 })
 
-parallelHook.promise().then(() => {
-  console.log("promise 触发")
-})
+// parallelHook.promise().then(() => {
+//   console.log("promise 触发")
+// })
 
 
 const parallelHook2 = new AsyncParallelHook();
