@@ -54,9 +54,31 @@ _addModuleChain作用
 	对于当前模块，或许存在着多个依赖的模块，当前模块会开辟一个依赖模块的数组，在遍历AST时，将require()中的模块通过addDependency()添加倒数组中，当前模块构建完成之后，webpack调用processModuleDependencies开始递归处理依赖的module,接着就会重复之前的构建步骤
 
 3. 构建细节
-module是webpack构建的核心实体，也是所有module的父类，它有几种不同子类：NormalModule，MultiModule, ContextModule, DelegatedModule等。但是这些核心实体都是在构建中
+module是webpack构建的核心实体，也是所有module的父类，它有几种不同子类：NormalModule，MultiModule, ContextModule, DelegatedModule等。但是这些核心实体都是在构建中都会调用对应的方法，也就是build()
 
 
+对于每一个module，它都会有这样一个构建方法。当然，它还包括了从构建到输出的一系列有关module生命周期的函数，我们通过module父类类图其子类类图()，这里以NormalModule为例观察其真实形态
+
+
+打包输出
+在所有模块极其依赖的模块build完成后，webpack会监听seal事件调用各插件对构建后的结果进行封装，要逐次对每一个module和chunk进行整理，生成编译之后的源码，合并，拆分，生成hash。同时这是我们在开发时进行代码优化和功能添加的关键环节
+
+不同的Template
+通过判断是入口js还是异步加载js来选择不同的模板对象进行封装，入口js会采用webpack事件流的render事件来触发Template类中的renderChunkModules()（异步加载js会调用chunkTempalte中的render方法）
+
+template一共有四个Template子类
+分别是 MainTemplate 对entry模块处理
+	chunkTemplate 对异步加载模块的处理
+	ModuleTemplate 对所有模块进行代码生成
+	HotUpdateChunkTemplate 对热替换模块的处理
+
+生成assets 
+各模块进行doBlock后，把module的最终代码循环加到source中，一个source对应着一个asset对象，改对象保存了单个文件的文件名和最终代码
+
+输出 
+最后webpack调用Compiler中的emitAssets()，按照output中的配置项将文件输出到对应的path文件夹中，从而webpack整个打包结束，如果相对结果进行处理，则需要在emit触发后对自定义插件进行扩展
+
+webpack整体流程主要依赖compilation和module两个对象， webpack本质上是一个插件的集合，并且由tapable控制各插件在webpack事件流上运行， 在业务中，无论是为了提升构建的效率，或是减少打包的大小，我们都可以通过编写webpack插件来进行流程的控制
 
 打包文件流程 
 webpack.js中compiler.options = new WebpackOptionsApply().process(options, compiler);
@@ -77,16 +99,129 @@ DynamicEntryPlugin.js
 
 
 
+tapable
+
+webpack本质上是一种事件流机制，他的工作流程就是将各个插件串联起来，而实现这一切的核心就是tapable
+webpack中最核心的负责编译的compiler和负责创建bundles的compilation都是tapable的子类
+
+
+webpack是高度复杂插件的集合，tapable提供对事件的注册，和触发
+
+所有的hook的构造函数均接受一个可选的string类型的数组
+
+对于syncHook，通过tap添加插件，通过call来触发钩子上绑定的插件的顺序执行
+
+对于非sync*类型的钩子，即async*类型的钩子可以通过tap tapAsync tapPromise注册事件，通过call promise callAsync调用事件
+
+.promsie 事件执行之后返回promise对象， 注册时候的函数也返回promise对象
+.callAsync 事件执行时，执行回调函数
+
+
+通过上面的例子，可能大致已经了解tapable用法以及作用
+1. 插件注册数量
+2. 插件注册的类型(sync, async, promise) 方法tap, tapAsync, tapPromise
+3. 插件调用的方式(sync, async, promise) 方法call, callAsync, promise
+4. 在实例化钩子的时候，参数的数量
+5. 是否使用interception
+
+tapable
+sync*
+	SyncHook
+	SyncBailHook
+	SyncWaterfailHook
+	SyncLoopHook
+
+async*
+	asyncParallel*
+		AsyncParallelHook
+		AsyncParallelBailHook
+		
+	asyncSeries*
+		AsyncSeriesHook
+		AsyncSeriesBailHook
+		AsyncSeriesWaterFallHook
+
+
+sync 同步，
+以sync开头的的钩子都是顺序执行的，
+并且只能使用tap注册事件，
+不能使用tapPromise, tapAsync注册
+
+//所有的钩子都继承于Hook
+class Sync* extends Hook { 
+	tapAsync() { // Sync*类型的钩子不支持tapAsync
+		throw new Error("tapAsync is not supported on a Sync*");
+	}
+	tapPromise() {// Sync*类型的钩子不支持tapPromise
+		throw new Error("tapPromise is not supported on a Sync*");
+	}
+	compile(options) { // 编译代码来按照一定的策略执行Plugin
+		factory.setup(this, options);
+		return factory.create(options);
+	}
+}
+
+对于async开头的钩子都可以使用tap, tapAsync, tapPromise进行注册事件
+
+每次调用tap, tapPromise, tapAsync注册不同类型的插件钩子， 通过call, promise, callAsync方式进行调用。其实调用的时候为了按照一定的执行策略执行，调用compile方法快速编译出一个方法来执行这些插件
 
 
 
+webpack初始化文件实际上就是初始化了一个compiler，并且调用了run()方法，开始编译，webpack的编译都按照下面的钩子调用顺序进行执行
+
+before-run 清除缓存
+run 注册缓存数据钩子
+before-compiler
+compiler 开始编译
+make 从入口分析依赖以及间接依赖模块，创建模块对象
+build-module 模块构建
+seal 构建结果封装，不可再更改
+after-compiler 完成构建，缓存数据
+emit 输出到dist目录
+
+
+编译&构建流程
+webpack中负责编译和构建的都是compilation
+
+
+webpackmake钩子中，tapAsync注册了DellEntryPlugin, 将入口模块通过调用compilation.addEntry方法，将所有的入口模块添加到编译构建队列中，开始编译流程
+
+compilation.addEntry中调用this._addModuleChain开始编译，在_addModuleChain首先会生成模块，最后构建
+
+在编译完成之后， 调用compilation.seal方法封闭，生成资源，这些资源保存在compilation.assets中，compilation.chunk， 在给webpak写插件的时候会用到
+
+
+钩子
+
+钩子(Hook) 就是一些具有既定生命周期的框架工具，在生命周期的各个阶段预留给用户执行一些特定操作的口子，这其实是一种面向切面编程
+
+这里有两个关键词 既定生命周期 和 面向切面编程
+
+只有拥有既定的生命周期的框架工具才需要预留用户自定义操作的口子
+gulp 的工作方式是定义一个串行的任务管道流，你可以自由的拼接各种任务，这就叫做没有既定生命周期，这时候钩子毫无意义
+但是webpack就不太一样，他已经定义好了分析，编译，打包，输出的整个流程，倘若你想在编译结束之后打包输出之前做的一些事情，而webpack有不给你任何介入的钩子，那么做任何努力都是白费，这就是钩子的意义所在
+
+面向切面：在框架运行到某一个阶段，插入一刀，进行一个或者多个特定操作
 
 
 
+tapable总结
 
+同步钩子只能使用tap注册钩子，异步钩子tap, tapPromise, tapAsync都可以注册
 
+同步钩子使用call触发，但是也可以使用callSync和promise触发
 
+异步钩子不能使用call触发，只能使用callSync, promisec触发
 
+每次触发钩子，都会把钩子上面的插件从头开始执行一次
+
+尽量不要在一个钩子上使用不同的注册方式注册插件tap tapPromise tapAsync
+
+使用callAsync调用钩子的时候，传入的参数需要和钩子实例化时候参数数量保持一致
+
+使用call进行钩子调用，钩子上所有插件执行完毕之后不会有任何的触发，
+使用callAsync会触发回调函数
+使用promise会返回一个Promsie对象
 
 
 
