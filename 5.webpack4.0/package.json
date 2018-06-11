@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "webpack --config webpack.config.js --watch --hot --color"
+    "build": "webpack --config webpack.config.js --hot --color"
   },
   "author": "",
   "license": "ISC",

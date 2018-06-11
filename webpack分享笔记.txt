@@ -1,4 +1,4 @@
-笔记 
+10笔记 
 每次输入webpack, 都会最先调用node_modules/.bin/webpack脚本
 
 阶段
@@ -224,7 +224,17 @@ tapable总结
 使用promise会返回一个Promsie对象
 
 
+webpack打包流程，钩子，以及钩子的作用时间
+1. 配置项初始化 webpack.js中进行
+代码： options = new WebpackOptionsDefaulter().process(options);
 
+2. webpack运行环境初始化
+beforeRun钩子
+new NodeEnvironmentPlugin().apply(compiler);
+NodeEnvironmentPlugin.js 里面在钩子beforerun上注册了一个
+compiler.hooks.beforeRun.tap("NodeEnvironmentPlugin", compiler => {
+	if (compiler.inputFileSystem === inputFileSystem) inputFileSystem.purge();
+});
 
 
 
